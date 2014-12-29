@@ -38,6 +38,7 @@ module Fluent
     def initialize
       require 'zlib'
       require 'time'
+      require 'fluent/plugin/file_util'
       super
     end
 
@@ -57,6 +58,16 @@ module Fluent
         @path_prefix = @path+"."
         @path_suffix = ".log"
         conf['buffer_path'] ||= "#{@path}.*"
+      end
+
+      test_path =
+        if @append
+          Time.now.strftime("#{@path_prefix}#{@time_slice_format}#{@path_suffix}#{suffix}")
+        else
+          Time.now.strftime("#{@path_prefix}#{@time_slice_format}_0#{@path_suffix}#{suffix}")
+        end
+      unless ::Fluent::FileUtil.writable?(test_path)
+        raise ConfigError, "out_file: `#{test_path}` is not writable."
       end
 
       super
@@ -97,14 +108,16 @@ module Fluent
 
     private
 
-    def generate_path(chunk)
+    def suffix
       case @compress
       when nil
-        suffix = ''
+        ''
       when :gz
-        suffix = ".gz"
+        ".gz"
       end
+    end
 
+    def generate_path(chunk)
       if @append
         "#{@path_prefix}#{chunk.key}#{@path_suffix}#{suffix}"
       else
